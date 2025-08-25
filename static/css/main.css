@@ -1,5 +1,11 @@
 /* DayCare Invoice Tracker - Modern Theme System */
 
+/* FOUC Prevention - Apply dark background immediately if needed */
+.theme-loading {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+}
+
 :root {
     /* Light Theme Colors */
     --bs-primary: #2563eb;

@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ provider.name }} - DayCare Invoice Tracker{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item">
+                                <a href="{% url 'invoices:provider_list' %}">Providers</a>
+                            </li>
+                            <li class="breadcrumb-item active">{{ provider.name }}</li>
+                        </ol>
+                    </nav>
+                    <h2 class="h3 mb-0">
+                        <i class="bi bi-building"></i>
+                        {{ provider.name }}
+                    </h2>
+                    <span class="badge bg-{{ provider.is_active|yesno:'success,secondary' }} mt-2">
+                        {{ provider.is_active|yesno:'Active,Inactive' }}
+                    </span>
+                </div>
+                <div>
+                    <a href="/admin/invoices/daycareprovider/{{ provider.pk }}/change/" class="btn btn-primary">
+                        <i class="bi bi-pencil"></i>
+                        Edit Provider
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Provider Information -->
+                <div class="col-lg-4 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="bi bi-info-circle"></i>
+                                Provider Information
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if provider.address %}
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Address</label>
+                                <p class="mb-0">{{ provider.address|linebreaks }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            {% if provider.phone %}
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Phone</label>
+                                <p class="mb-0">
+                                    <a href="tel:{{ provider.phone }}" class="text-decoration-none">
+                                        <i class="bi bi-telephone"></i>
+                                        {{ provider.phone }}
+                                    </a>
+                                </p>
+                            </div>
+                            {% endif %}
+                            
+                            {% if provider.email %}
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Email</label>
+                                <p class="mb-0">
+                                    <a href="mailto:{{ provider.email }}" class="text-decoration-none">
+                                        <i class="bi bi-envelope"></i>
+                                        {{ provider.email }}
+                                    </a>
+                                </p>
+                            </div>
+                            {% endif %}
+                            
+                            {% if provider.license_number %}
+                            <div class="mb-3">
+                                <label class="form-label text-muted">License Number</label>
+                                <p class="mb-0">{{ provider.license_number }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            {% if provider.gst_number %}
+                            <div class="mb-3">
+                                <label class="form-label text-muted">GST Number</label>
+                                <p class="mb-0">{{ provider.gst_number }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Children and Recent Activity -->
+                <div class="col-lg-8">
+                    <!-- Children at This Provider -->
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi bi-people"></i>
+                                Your Children ({{ user_children.count }})
+                            </h5>
+                            <a href="{% url 'invoices:child_create' %}" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-plus-circle"></i>
+                                Add Child
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            {% if user_children %}
+                            <div class="row">
+                                {% for child in user_children %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="border rounded p-3">
+                                        <h6 class="mb-1">{{ child.name }}</h6>
+                                        <small class="text-muted">
+                                            Ref: {{ child.reference_number }}
+                                        </small>
+                                        {% if child.date_of_birth %}
+                                        <br>
+                                        <small class="text-muted">
+                                            Born: {{ child.date_of_birth|date:"M d, Y" }}
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-muted mb-0">No children registered at this provider.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Recent Invoices -->
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi bi-receipt"></i>
+                                Recent Invoices
+                            </h5>
+                            <a href="{% url 'invoices:invoice_create' %}" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-plus-circle"></i>
+                                Add Invoice
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            {% if invoices %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice</th>
+                                            <th>Child</th>
+                                            <th>Date</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for invoice in invoices %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'invoices:invoice_detail' invoice.pk %}" class="text-decoration-none">
+                                                    {{ invoice.invoice_reference }}
+                                                </a>
+                                            </td>
+                                            <td>{{ invoice.child.name }}</td>
+                                            <td>{{ invoice.issue_date|date:"M d, Y" }}</td>
+                                            <td>${{ invoice.amount_due|floatformat:2 }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ invoice.payment_status|default:'secondary' }}">
+                                                    {{ invoice.get_payment_status_display }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-center mt-3">
+                                <a href="{% url 'invoices:invoice_list' %}" class="btn btn-outline-secondary btn-sm">
+                                    View All Invoices
+                                </a>
+                            </div>
+                            {% else %}
+                            <p class="text-muted mb-0">No invoices found for this provider.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

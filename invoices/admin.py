@@ -1,10 +1,39 @@
 from django.contrib import admin
+from django import forms
 from .models import DaycareProvider, Child, Invoice, Payment
+
+
+class DaycareProviderAdminForm(forms.ModelForm):
+    """Custom form for DaycareProvider admin to handle JSON fields properly"""
+    
+    class Meta:
+        model = DaycareProvider
+        fields = '__all__'
+        widgets = {
+            'email_addresses': forms.Textarea(attrs={
+                'rows': 3, 
+                'cols': 50,
+                'placeholder': 'Enter email addresses as JSON array, e.g., ["admin@daycare.com", "billing@daycare.com"]'
+            }),
+            'email_subject_patterns': forms.Textarea(attrs={
+                'rows': 3, 
+                'cols': 50,
+                'placeholder': 'Enter subject patterns as JSON array, e.g., ["Invoice", "Bill", "Payment"]'
+            }),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Provide default JSON values for new instances
+        if not self.instance.pk:
+            self.fields['email_addresses'].initial = []
+            self.fields['email_subject_patterns'].initial = []
 
 
 @admin.register(DaycareProvider)
 class DaycareProviderAdmin(admin.ModelAdmin):
     """Admin configuration for DaycareProvider model"""
+    form = DaycareProviderAdminForm
     list_display = ['name', 'email', 'phone', 'is_active', 'created_at']
     list_filter = ['is_active', 'created_at']
     search_fields = ['name', 'email', 'phone']

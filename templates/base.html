@@ -14,6 +14,18 @@
     <!-- Custom CSS -->
     <link href="{% static 'css/main.css' %}" rel="stylesheet">
     
+    <!-- Prevent FOUC by applying theme immediately -->
+    <script>
+        (function() {
+            const theme = localStorage.getItem('theme') || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+            if (theme === 'dark') {
+                document.body.classList.add('theme-loading');
+            }
+        })();
+    </script>
+    
     {% block extra_css %}{% endblock %}
 </head>
 <body class="d-flex flex-column min-vh-100">
@@ -54,6 +66,12 @@
                         <a class="nav-link" href="{% url 'invoices:child_list' %}">
                             <i class="bi bi-people"></i>
                             Children
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'invoices:provider_list' %}">
+                            <i class="bi bi-building"></i>
+                            Providers
                         </a>
                     </li>
                 </ul>

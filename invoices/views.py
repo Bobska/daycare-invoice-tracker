@@ -259,3 +259,49 @@ def invoice_quick_stats(request):
     }
     
     return JsonResponse(stats)
+
+
+# Daycare Provider Management Views
+
+class ProviderListView(LoginRequiredMixin, ListView):
+    """List view for daycare providers"""
+    model = DaycareProvider
+    template_name = 'invoices/provider_list.html'
+    context_object_name = 'providers'
+    
+    def get_queryset(self):
+        # Show providers that have children associated with this user
+        return DaycareProvider.objects.filter(
+            children__user=self.request.user
+        ).distinct().order_by('name')
+
+
+class ProviderDetailView(LoginRequiredMixin, DetailView):
+    """Detailed view of a daycare provider"""
+    model = DaycareProvider
+    template_name = 'invoices/provider_detail.html'
+    context_object_name = 'provider'
+    
+    def get_queryset(self):
+        # Only show providers that have children associated with this user
+        return DaycareProvider.objects.filter(
+            children__user=self.request.user
+        ).distinct()
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        provider = self.get_object()
+        
+        # Get user's children at this provider
+        context['user_children'] = Child.objects.filter(
+            user=self.request.user,
+            daycare_provider=provider
+        )
+        
+        # Get invoices for this provider
+        context['invoices'] = Invoice.objects.filter(
+            child__user=self.request.user,
+            child__daycare_provider=provider
+        ).select_related('child').order_by('-issue_date')[:10]
+        
+        return context

@@ -46,6 +46,9 @@ document.addEventListener('DOMContentLoaded', function() {
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('theme', theme);
             
+            // Remove FOUC loading class
+            document.body.classList.remove('theme-loading');
+            
             if (themeIcon) {
                 themeIcon.className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
             }
@@ -62,29 +65,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Placeholder Features System
+    // Placeholder Features System - Updated for Phase 2
     function initializePlaceholderFeatures() {
-        const featureModal = new bootstrap.Modal(document.getElementById('featureModal'));
+        const featureModal = document.getElementById('featureModal');
+        if (!featureModal) return;
+        
+        const modalInstance = new bootstrap.Modal(featureModal);
         const featureName = document.getElementById('featureName');
         const featureDescription = document.getElementById('featureDescription');
         const featurePhase = document.getElementById('featurePhase');
         
-        const features = {
-            'invoices': {
-                name: 'Invoice Management',
-                description: 'Upload and process PDF invoices, automatically extract data, and manage invoice details with advanced filtering and search capabilities.',
-                phase: 'Phase 2'
-            },
-            'payments': {
-                name: 'Payment Tracking',
-                description: 'Record payments, track payment history, handle partial payments, and generate payment reports with multiple payment method support.',
-                phase: 'Phase 2'
-            },
-            'children': {
-                name: 'Child Management',
-                description: 'Manage child profiles, daycare provider assignments, and track enrollment details with comprehensive child information management.',
-                phase: 'Phase 2'
-            },
+        // Only future features get placeholders - Phase 2 features are working
+        const futureFeatures = {
             'settings': {
                 name: 'User Settings',
                 description: 'Customize your account preferences, notification settings, and configure email automation rules for invoice processing.',
@@ -99,23 +91,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 name: 'Email Automation',
                 description: 'Automatically process emails from daycare providers, extract invoice PDFs, and streamline the invoice workflow.',
                 phase: 'Phase 3'
+            },
+            'bulk-actions': {
+                name: 'Bulk Actions',
+                description: 'Select multiple invoices or payments to perform bulk operations like bulk payments, status updates, or export.',
+                phase: 'Phase 3'
+            },
+            'notifications': {
+                name: 'Smart Notifications',
+                description: 'Automated reminders for overdue payments, upcoming due dates, and invoice processing notifications.',
+                phase: 'Phase 3'
             }
         };
         
-        // Add click handlers to placeholder links
+        // Add click handlers ONLY to future features
         document.addEventListener('click', function(e) {
             const featureLink = e.target.closest('[data-feature]');
             if (featureLink) {
-                e.preventDefault();
                 const featureKey = featureLink.getAttribute('data-feature');
-                const feature = features[featureKey];
+                const feature = futureFeatures[featureKey];
                 
+                // Only prevent default and show modal for FUTURE features
                 if (feature) {
+                    e.preventDefault();
                     featureName.textContent = feature.name;
                     featureDescription.textContent = feature.description;
                     featurePhase.textContent = feature.phase;
-                    featureModal.show();
+                    modalInstance.show();
                 }
+                // Phase 2 features (invoices, payments, children) will work normally
             }
         });
     }

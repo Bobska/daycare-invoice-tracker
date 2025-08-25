@@ -5,6 +5,11 @@ from decimal import Decimal
 User = get_user_model()
 
 
+def default_list():
+    """Return empty list for JSONField default"""
+    return []
+
+
 class DaycareProvider(models.Model):
     """Daycare provider information"""
     name = models.CharField(max_length=200)
@@ -17,11 +22,13 @@ class DaycareProvider(models.Model):
     
     # Future email automation fields
     email_addresses = models.JSONField(
-        default=list,
+        default=default_list,
+        blank=True,
         help_text="Known email addresses for automatic invoice detection"
     )
     email_subject_patterns = models.JSONField(
-        default=list,
+        default=default_list,
+        blank=True,
         help_text="Email subject patterns to identify invoices"
     )
     
