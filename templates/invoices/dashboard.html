@@ -102,7 +102,7 @@
                     <i class="bi bi-receipt"></i>
                     Recent Invoices
                 </h5>
-                <a href="#" class="btn btn-sm btn-outline-primary" data-feature="invoices">
+                <a href="{% url 'invoices:invoice_list' %}" class="btn btn-sm btn-outline-primary">
                     View All
                 </a>
             </div>
@@ -121,7 +121,11 @@
                             <tbody>
                                 {% for invoice in recent_invoices %}
                                 <tr>
-                                    <td>{{ invoice.invoice_reference }}</td>
+                                    <td>
+                                        <a href="{% url 'invoices:invoice_detail' invoice.pk %}" class="text-decoration-none">
+                                            {{ invoice.invoice_reference }}
+                                        </a>
+                                    </td>
                                     <td>{{ invoice.child.name }}</td>
                                     <td>${{ invoice.amount_due|floatformat:2 }}</td>
                                     <td>
@@ -153,7 +157,7 @@
                     <i class="bi bi-credit-card"></i>
                     Recent Payments
                 </h5>
-                <a href="#" class="btn btn-sm btn-outline-primary" data-feature="payments">
+                <a href="{% url 'invoices:payment_list' %}" class="btn btn-sm btn-outline-primary">
                     View All
                 </a>
             </div>
@@ -206,19 +210,19 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-3 mb-2">
-                        <a href="#" class="btn btn-outline-primary w-100" data-feature="invoices">
+                        <a href="{% url 'invoices:invoice_create' %}" class="btn btn-outline-primary w-100">
                             <i class="bi bi-plus-circle"></i>
                             Add Invoice
                         </a>
                     </div>
                     <div class="col-md-3 mb-2">
-                        <a href="#" class="btn btn-outline-success w-100" data-feature="payments">
+                        <a href="{% url 'invoices:payment_create' %}" class="btn btn-outline-success w-100">
                             <i class="bi bi-plus-circle"></i>
                             Record Payment
                         </a>
                     </div>
                     <div class="col-md-3 mb-2">
-                        <a href="#" class="btn btn-outline-info w-100" data-feature="children">
+                        <a href="{% url 'invoices:child_create' %}" class="btn btn-outline-info w-100">
                             <i class="bi bi-person-plus"></i>
                             Add Child
                         </a>
@@ -230,10 +234,10 @@
                         </a>
                     </div>
                 </div>
-                <div class="alert alert-info mt-3" role="alert">
-                    <i class="bi bi-info-circle"></i>
-                    <strong>Phase 1 Complete!</strong> 
-                    This is the foundation dashboard. Invoice management, PDF processing, and advanced features will be added in Phase 2-4. Click any feature button to see the development roadmap.
+                <div class="alert alert-success mt-3" role="alert">
+                    <i class="bi bi-check-circle"></i>
+                    <strong>Phase 2 Active!</strong> 
+                    PDF processing, invoice management, and payment tracking are now fully functional. Upload PDFs for automatic data extraction!
                 </div>
             </div>
         </div>

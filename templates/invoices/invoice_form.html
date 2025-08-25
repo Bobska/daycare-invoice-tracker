@@ -1,0 +1,292 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ object|yesno:"Edit,Add" }} Invoice{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="text-primary mb-1">
+                        <i class="fas fa-file-invoice-dollar me-2"></i>
+                        {{ object|yesno:"Edit,Add" }} Invoice
+                    </h2>
+                    <p class="text-muted mb-0">
+                        {{ object|yesno:"Update invoice details,Upload PDF or enter invoice details manually" }}
+                    </p>
+                </div>
+                <a href="{% url 'invoices:invoice_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Invoices
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Upload Section (only for new invoices) -->
+    {% if not object %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cloud-upload-alt me-2"></i>
+                        PDF Upload & Auto-Extract
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="pdf-upload-area" class="upload-area border-dashed p-4 text-center mb-3">
+                        <div class="upload-content">
+                            <i class="fas fa-file-pdf fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">Drag & Drop PDF Here</h5>
+                            <p class="text-muted mb-3">or click to browse</p>
+                            <input type="file" id="pdf-file-input" accept=".pdf" class="d-none">
+                            <button type="button" class="btn btn-outline-info" onclick="document.getElementById('pdf-file-input').click()">
+                                Choose PDF File
+                            </button>
+                        </div>
+                        <div class="upload-progress d-none">
+                            <div class="progress mb-2">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <p class="text-info mb-0">Processing PDF...</p>
+                        </div>
+                    </div>
+                    <div id="extraction-results" class="d-none">
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            PDF processed successfully! Review and edit the extracted data below.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Invoice Form -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit me-2"></i>
+                        Invoice Details
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="invoice-form">
+                        {% csrf_token %}
+                        {% crispy form %}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-light">
+                    <h6 class="text-info mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Help & Tips
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">PDF Upload</h6>
+                            <ul class="small text-muted">
+                                <li>Upload PDF invoices for automatic data extraction</li>
+                                <li>Supported file size: up to 10MB</li>
+                                <li>Review extracted data before saving</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Manual Entry</h6>
+                            <ul class="small text-muted">
+                                <li>All fields can be entered manually</li>
+                                <li>Child must be added before creating invoices</li>
+                                <li>Amounts will be validated automatically</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.upload-area {
+    border: 2px dashed #dee2e6;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.upload-area:hover {
+    border-color: var(--bs-info);
+    background-color: rgba(var(--bs-info-rgb), 0.05);
+}
+
+.upload-area.dragover {
+    border-color: var(--bs-success);
+    background-color: rgba(var(--bs-success-rgb), 0.1);
+}
+
+.border-dashed {
+    border-style: dashed !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.getElementById('pdf-upload-area');
+    const fileInput = document.getElementById('pdf-file-input');
+    const uploadContent = uploadArea.querySelector('.upload-content');
+    const uploadProgress = uploadArea.querySelector('.upload-progress');
+    const extractionResults = document.getElementById('extraction-results');
+
+    // Drag and drop functionality
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0 && files[0].type === 'application/pdf') {
+            handleFileUpload(files[0]);
+        }
+    });
+
+    uploadArea.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            handleFileUpload(this.files[0]);
+        }
+    });
+
+    function handleFileUpload(file) {
+        // Show progress
+        uploadContent.classList.add('d-none');
+        uploadProgress.classList.remove('d-none');
+        
+        const formData = new FormData();
+        formData.append('pdf_file', file);
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+        // Upload and process PDF
+        fetch('{% url "invoices:invoice_upload_ajax" %}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            uploadProgress.classList.add('d-none');
+            
+            if (data.success) {
+                // Show success message
+                extractionResults.classList.remove('d-none');
+                
+                // Fill form with extracted data
+                if (data.data) {
+                    fillFormWithData(data.data);
+                }
+                
+                // Show warnings if any
+                if (data.warnings && data.warnings.length > 0) {
+                    showWarnings(data.warnings);
+                }
+            } else {
+                showErrors(data.errors);
+                uploadContent.classList.remove('d-none');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            uploadProgress.classList.add('d-none');
+            uploadContent.classList.remove('d-none');
+            showErrors({'upload': 'Error uploading file. Please try again.'});
+        });
+    }
+
+    function fillFormWithData(data) {
+        // Fill form fields with extracted data
+        const fields = {
+            'id_invoice_reference': data.invoice_reference,
+            'id_period_start': data.period_start,
+            'id_period_end': data.period_end,
+            'id_issue_date': data.issue_date,
+            'id_due_date': data.due_date,
+            'id_original_amount': data.original_amount,
+            'id_amount_due': data.amount_due,
+            'id_discount_amount': data.discount_amount,
+            'id_discount_percentage': data.discount_percentage,
+            'id_fee_type': data.fee_type,
+        };
+
+        for (const [fieldId, value] of Object.entries(fields)) {
+            const field = document.getElementById(fieldId);
+            if (field && value) {
+                field.value = value;
+            }
+        }
+
+        // Select matched child if found
+        if (data.matched_child_id) {
+            const childField = document.getElementById('id_child');
+            if (childField) {
+                childField.value = data.matched_child_id;
+            }
+        }
+    }
+
+    function showWarnings(warnings) {
+        warnings.forEach(warning => {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-warning alert-dismissible fade show mt-2';
+            alert.innerHTML = `
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                ${warning}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            extractionResults.appendChild(alert);
+        });
+    }
+
+    function showErrors(errors) {
+        for (const [field, error] of Object.entries(errors)) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-danger alert-dismissible fade show mt-2';
+            alert.innerHTML = `
+                <i class="fas fa-exclamation-circle me-2"></i>
+                ${error}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            uploadArea.parentNode.appendChild(alert);
+        }
+    }
+});
+</script>
+{% endblock %}

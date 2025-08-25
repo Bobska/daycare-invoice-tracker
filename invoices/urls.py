@@ -7,8 +7,22 @@ urlpatterns = [
     # Dashboard
     path('', views.DashboardView.as_view(), name='dashboard'),
     
-    # Placeholder URLs for future development
+    # Invoice management
     path('invoices/', views.InvoiceListView.as_view(), name='invoice_list'),
+    path('invoices/create/', views.InvoiceCreateView.as_view(), name='invoice_create'),
+    path('invoices/<int:pk>/', views.InvoiceDetailView.as_view(), name='invoice_detail'),
+    path('invoices/<int:pk>/edit/', views.InvoiceUpdateView.as_view(), name='invoice_edit'),
+    
+    # Payment management
     path('payments/', views.PaymentListView.as_view(), name='payment_list'),
+    path('payments/create/', views.PaymentCreateView.as_view(), name='payment_create'),
+    
+    # Child management
     path('children/', views.ChildListView.as_view(), name='child_list'),
+    path('children/create/', views.ChildCreateView.as_view(), name='child_create'),
+    path('children/<int:pk>/edit/', views.ChildUpdateView.as_view(), name='child_edit'),
+    
+    # AJAX endpoints
+    path('ajax/invoice-upload/', views.invoice_upload_ajax, name='invoice_upload_ajax'),
+    path('ajax/quick-stats/', views.invoice_quick_stats, name='invoice_quick_stats'),
 ]

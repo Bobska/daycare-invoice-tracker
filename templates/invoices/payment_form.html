@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Record Payment{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="text-success mb-1">
+                        <i class="fas fa-credit-card me-2"></i>
+                        Record Payment
+                    </h2>
+                    <p class="text-muted mb-0">
+                        Add a new payment record for an invoice
+                    </p>
+                </div>
+                <a href="{% url 'invoices:payment_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Payments
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Payment Form -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-plus me-2"></i>
+                        Payment Details
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="payment-form">
+                        {% csrf_token %}
+                        {% crispy form %}
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Invoice Summary (if pre-selected) -->
+            {% if form.initial.invoice %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-file-invoice me-2"></i>
+                        Invoice Summary
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-6">Invoice:</dt>
+                        <dd class="col-6">{{ form.initial.invoice.invoice_reference }}</dd>
+                        
+                        <dt class="col-6">Child:</dt>
+                        <dd class="col-6">{{ form.initial.invoice.child.name }}</dd>
+                        
+                        <dt class="col-6">Amount Due:</dt>
+                        <dd class="col-6">${{ form.initial.invoice.amount_due }}</dd>
+                        
+                        <dt class="col-6">Paid:</dt>
+                        <dd class="col-6 text-success">${{ form.initial.invoice.total_paid }}</dd>
+                        
+                        <dt class="col-6">Outstanding:</dt>
+                        <dd class="col-6 {% if form.initial.invoice.outstanding_balance > 0 %}text-danger{% else %}text-success{% endif %}">
+                            ${{ form.initial.invoice.outstanding_balance }}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Payment Methods Info -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h6 class="text-info mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Payment Methods
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="small text-muted">
+                        <div class="row">
+                            <div class="col-6">
+                                <ul class="list-unstyled mb-0">
+                                    <li><i class="fas fa-university me-1"></i> Direct Credit</li>
+                                    <li><i class="fas fa-money-bill me-1"></i> Cash</li>
+                                    <li><i class="fas fa-credit-card me-1"></i> Credit Card</li>
+                                </ul>
+                            </div>
+                            <div class="col-6">
+                                <ul class="list-unstyled mb-0">
+                                    <li><i class="fas fa-exchange-alt me-1"></i> EFTPOS</li>
+                                    <li><i class="fas fa-money-check me-1"></i> Cheque</li>
+                                    <li><i class="fas fa-ellipsis-h me-1"></i> Other</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const invoiceSelect = document.getElementById('id_invoice');
+    const amountField = document.getElementById('id_amount_paid');
+    
+    // Update suggested amount when invoice changes
+    if (invoiceSelect && amountField) {
+        invoiceSelect.addEventListener('change', function() {
+            if (this.value) {
+                // You could fetch outstanding balance via AJAX here
+                // For now, we'll rely on the initial value set by the view
+            }
+        });
+    }
+    
+    // Form validation
+    const form = document.getElementById('payment-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const amount = parseFloat(amountField.value);
+            if (amount <= 0) {
+                e.preventDefault();
+                alert('Payment amount must be greater than zero.');
+                amountField.focus();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

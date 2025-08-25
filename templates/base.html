@@ -39,19 +39,19 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-feature="invoices">
+                        <a class="nav-link" href="{% url 'invoices:invoice_list' %}">
                             <i class="bi bi-receipt"></i>
                             Invoices
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-feature="payments">
+                        <a class="nav-link" href="{% url 'invoices:payment_list' %}">
                             <i class="bi bi-credit-card"></i>
                             Payments
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-feature="children">
+                        <a class="nav-link" href="{% url 'invoices:child_list' %}">
                             <i class="bi bi-people"></i>
                             Children
                         </a>
