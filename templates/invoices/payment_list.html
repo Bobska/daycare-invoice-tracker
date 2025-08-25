@@ -43,8 +43,8 @@
                             <td>{{ payment.reference_number|default:"-" }}</td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="#" class="btn btn-outline-primary">View</a>
-                                    <a href="#" class="btn btn-outline-secondary">Edit</a>
+                                    <a href="{% url 'invoices:payment_detail' payment.pk %}" class="btn btn-outline-primary">View</a>
+                                    <a href="{% url 'invoices:payment_edit' payment.pk %}" class="btn btn-outline-secondary">Edit</a>
                                 </div>
                             </td>
                         </tr>

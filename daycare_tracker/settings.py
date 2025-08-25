@@ -141,6 +141,7 @@ LOGOUT_REDIRECT_URL = 'accounts:login'
 
 # Crispy forms
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
+CRISPY_ALLOWED_TEMPLATE_PACKS = 'bootstrap4'
 
 # Email settings (for future phases)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Console backend for development

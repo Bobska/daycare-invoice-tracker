@@ -66,11 +66,27 @@ class InvoiceListView(LoginRequiredMixin, ListView):
     paginate_by = 20
     
     def get_queryset(self):
-        return Invoice.objects.filter(
+        queryset = Invoice.objects.filter(
             child__user=self.request.user
         ).select_related(
             'child', 'child__daycare_provider'
         ).order_by('-issue_date')
+        
+        # Filter by child if specified
+        child_id = self.request.GET.get('child')
+        if child_id:
+            try:
+                child_id = int(child_id)
+                queryset = queryset.filter(child_id=child_id)
+            except (ValueError, TypeError):
+                pass
+        
+        # Filter by status if specified
+        status = self.request.GET.get('status')
+        if status and status in ['paid', 'partial', 'unpaid', 'overdue']:
+            queryset = queryset.filter(payment_status=status)
+            
+        return queryset
 
 
 class PaymentListView(LoginRequiredMixin, ListView):
@@ -199,6 +215,35 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         messages.success(self.request, 'Payment recorded successfully!')
+        return super().form_valid(form)
+
+
+class PaymentDetailView(LoginRequiredMixin, DetailView):
+    """View payment details"""
+    model = Payment
+    template_name = 'invoices/payment_detail.html'
+    context_object_name = 'payment'
+
+    def get_queryset(self):
+        return Payment.objects.filter(
+            invoice__child__user=self.request.user
+        ).select_related('invoice', 'invoice__child', 'invoice__child__daycare_provider')
+
+
+class PaymentUpdateView(LoginRequiredMixin, UpdateView):
+    """Edit payment"""
+    model = Payment
+    form_class = PaymentForm
+    template_name = 'invoices/payment_form.html'
+    success_url = reverse_lazy('invoices:payment_list')
+
+    def get_queryset(self):
+        return Payment.objects.filter(
+            invoice__child__user=self.request.user
+        )
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Payment updated successfully!')
         return super().form_valid(form)
 
 

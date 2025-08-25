@@ -45,8 +45,8 @@
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="#" class="btn btn-outline-primary">View</a>
-                                    <a href="#" class="btn btn-outline-secondary">Edit</a>
+                                    <a href="{% url 'invoices:invoice_detail' invoice.pk %}" class="btn btn-outline-primary">View</a>
+                                    <a href="{% url 'invoices:invoice_edit' invoice.pk %}" class="btn btn-outline-secondary">Edit</a>
                                 </div>
                             </td>
                         </tr>

@@ -21,6 +21,8 @@ urlpatterns = [
     # Payment management
     path('payments/', views.PaymentListView.as_view(), name='payment_list'),
     path('payments/create/', views.PaymentCreateView.as_view(), name='payment_create'),
+    path('payments/<int:pk>/', views.PaymentDetailView.as_view(), name='payment_detail'),
+    path('payments/<int:pk>/edit/', views.PaymentUpdateView.as_view(), name='payment_edit'),
     
     # Child management
     path('children/', views.ChildListView.as_view(), name='child_list'),
