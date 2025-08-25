@@ -32,11 +32,14 @@ class RegisterView(CreateView):
     
     def form_valid(self, form):
         """Log in the user after successful registration"""
-        response = super().form_valid(form)
+        # Save the user first
         user = form.save()
+        # Log in the user
         login(self.request, user)
+        # Add success message
         messages.success(self.request, f'Welcome to DayCare Invoice Tracker, {user.first_name or user.username}!')
-        return response
+        # Redirect to success URL
+        return redirect(self.success_url)
     
     def dispatch(self, request, *args, **kwargs):
         """Redirect authenticated users to dashboard"""

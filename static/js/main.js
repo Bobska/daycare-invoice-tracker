@@ -16,27 +16,35 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     });
 
-    // Form validation helper
+    // Form validation and loading state handler
     const forms = document.querySelectorAll('.needs-validation');
     forms.forEach(function(form) {
         form.addEventListener('submit', function(event) {
+            // Check form validity
             if (!form.checkValidity()) {
                 event.preventDefault();
                 event.stopPropagation();
+                form.classList.add('was-validated');
+                return;
             }
+            
+            // Form is valid, show loading state
+            const submitButton = form.querySelector('button[type="submit"]');
+            if (submitButton) {
+                const originalContent = submitButton.innerHTML;
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+                submitButton.disabled = true;
+                
+                // Re-enable button if form submission fails (fallback)
+                setTimeout(function() {
+                    if (submitButton.disabled) {
+                        submitButton.innerHTML = originalContent;
+                        submitButton.disabled = false;
+                    }
+                }, 10000); // 10 second timeout
+            }
+            
             form.classList.add('was-validated');
-        });
-    });
-
-    // Loading state for forms
-    const submitButtons = document.querySelectorAll('button[type="submit"]');
-    submitButtons.forEach(function(button) {
-        button.addEventListener('click', function() {
-            const form = button.closest('form');
-            if (form && form.checkValidity()) {
-                button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
-                button.disabled = true;
-            }
         });
     });
 
