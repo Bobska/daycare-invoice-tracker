@@ -39,19 +39,19 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">
+                        <a class="nav-link" href="#" data-feature="invoices">
                             <i class="bi bi-receipt"></i>
                             Invoices
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">
+                        <a class="nav-link" href="#" data-feature="payments">
                             <i class="bi bi-credit-card"></i>
                             Payments
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#">
+                        <a class="nav-link" href="#" data-feature="children">
                             <i class="bi bi-people"></i>
                             Children
                         </a>
@@ -59,13 +59,19 @@
                 </ul>
                 
                 <ul class="navbar-nav">
+                    <!-- Theme Toggle Button -->
+                    <li class="nav-item d-flex align-items-center">
+                        <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle theme">
+                            <i class="bi bi-sun-fill" id="themeIcon"></i>
+                        </button>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-person-circle"></i>
                             {{ user.username }}
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#">
+                            <li><a class="dropdown-item" href="#" data-feature="settings">
                                 <i class="bi bi-gear"></i>
                                 Settings
                             </a></li>
@@ -106,7 +112,7 @@
                     <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
                         <i class="bi bi-{% if message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'success' %}check-circle{% elif message.tags == 'warning' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
                         {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 {% endfor %}
             {% endif %}
@@ -118,6 +124,40 @@
             {% block content %}{% endblock %}
         </div>
     </main>
+
+    <!-- Feature Coming Soon Modal -->
+    <div class="modal fade" id="featureModal" tabindex="-1" aria-labelledby="featureModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="featureModalLabel">
+                        <i class="bi bi-lightbulb"></i>
+                        Feature Coming Soon
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center">
+                        <div class="mb-3">
+                            <i class="bi bi-tools text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h6 class="fw-bold mb-3" id="featureName">Feature Name</h6>
+                        <p class="text-muted mb-3" id="featureDescription">Feature description will appear here.</p>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Development Phase:</strong> <span id="featurePhase">Phase X</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                        <i class="bi bi-check-lg"></i>
+                        Got it!
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="footer mt-auto">

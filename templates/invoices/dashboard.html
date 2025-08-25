@@ -18,19 +18,19 @@
 <!-- Statistics Cards -->
 <div class="row mb-4">
     <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card dashboard-card bg-primary text-white">
+        <div class="card dashboard-card stats-children">
             <div class="card-body">
                 <div class="card-title">{{ stats.total_children }}</div>
                 <div class="card-text">
                     <i class="bi bi-people"></i>
-                    Children
+                    Children Enrolled
                 </div>
             </div>
         </div>
     </div>
     
     <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card dashboard-card bg-info text-white">
+        <div class="card dashboard-card stats-invoices">
             <div class="card-body">
                 <div class="card-title">{{ stats.total_invoices }}</div>
                 <div class="card-text">
@@ -42,7 +42,7 @@
     </div>
     
     <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card dashboard-card bg-success text-white">
+        <div class="card dashboard-card stats-paid">
             <div class="card-body">
                 <div class="card-title">${{ stats.total_paid|floatformat:2 }}</div>
                 <div class="card-text">
@@ -54,12 +54,12 @@
     </div>
     
     <div class="col-lg-3 col-md-6 mb-3">
-        <div class="card dashboard-card {% if stats.outstanding_balance > 0 %}bg-warning{% else %}bg-success{% endif %} text-white">
+        <div class="card dashboard-card {% if stats.outstanding_balance > 0 %}stats-outstanding{% else %}stats-paid{% endif %}">
             <div class="card-body">
                 <div class="card-title">${{ stats.outstanding_balance|floatformat:2 }}</div>
                 <div class="card-text">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    Outstanding
+                    <i class="bi bi-{% if stats.outstanding_balance > 0 %}exclamation-triangle{% else %}check-circle{% endif %}"></i>
+                    Outstanding Balance
                 </div>
             </div>
         </div>
@@ -102,7 +102,7 @@
                     <i class="bi bi-receipt"></i>
                     Recent Invoices
                 </h5>
-                <a href="{% url 'invoices:invoice_list' %}" class="btn btn-sm btn-outline-primary">
+                <a href="#" class="btn btn-sm btn-outline-primary" data-feature="invoices">
                     View All
                 </a>
             </div>
@@ -153,7 +153,7 @@
                     <i class="bi bi-credit-card"></i>
                     Recent Payments
                 </h5>
-                <a href="{% url 'invoices:payment_list' %}" class="btn btn-sm btn-outline-primary">
+                <a href="#" class="btn btn-sm btn-outline-primary" data-feature="payments">
                     View All
                 </a>
             </div>
@@ -206,19 +206,19 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-3 mb-2">
-                        <a href="#" class="btn btn-outline-primary w-100">
+                        <a href="#" class="btn btn-outline-primary w-100" data-feature="invoices">
                             <i class="bi bi-plus-circle"></i>
                             Add Invoice
                         </a>
                     </div>
                     <div class="col-md-3 mb-2">
-                        <a href="#" class="btn btn-outline-success w-100">
+                        <a href="#" class="btn btn-outline-success w-100" data-feature="payments">
                             <i class="bi bi-plus-circle"></i>
                             Record Payment
                         </a>
                     </div>
                     <div class="col-md-3 mb-2">
-                        <a href="#" class="btn btn-outline-info w-100">
+                        <a href="#" class="btn btn-outline-info w-100" data-feature="children">
                             <i class="bi bi-person-plus"></i>
                             Add Child
                         </a>
@@ -233,7 +233,7 @@
                 <div class="alert alert-info mt-3" role="alert">
                     <i class="bi bi-info-circle"></i>
                     <strong>Phase 1 Complete!</strong> 
-                    This is the foundation dashboard. Invoice management, PDF processing, and advanced features will be added in future phases.
+                    This is the foundation dashboard. Invoice management, PDF processing, and advanced features will be added in Phase 2-4. Click any feature button to see the development roadmap.
                 </div>
             </div>
         </div>
