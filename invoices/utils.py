@@ -112,9 +112,11 @@ def parse_invoice_data(text: str) -> Dict:
     
     # Extract invoice reference number
     invoice_patterns = [
+        r'INV\s+(\d+)',  # Pattern for "INV 78352" - put this first for better matching
         r'INVOICE\s*(?:NO|NUMBER|#)?\s*:?\s*(\w+[\w\-]*)',
         r'REFERENCE\s*(?:NO|NUMBER)?\s*:?\s*(\w+[\w\-]*)',
         r'INV\s*(?:NO|#)?\s*:?\s*(\w+[\w\-]*)',
+        r'REF\s+(\w+)',   # Pattern for "REF 78352"
     ]
     
     for pattern in invoice_patterns:
@@ -129,6 +131,8 @@ def parse_invoice_data(text: str) -> Dict:
         r'STUDENT\s*NAME\s*:\s*([A-Z\s]+)',
         r'CHILD\s*:\s*([A-Z\s]+)',
         r'FOR\s*:\s*([A-Z\s]+)',
+        r'STATEMENT\s+FOR\s+([A-Z\s]+?)\s*-\w+',  # Pattern for "Statement for Sofia Green-SG300"
+        r'NAME\s*:\s*([A-Z\s]+?)(?:\s+AMOUNT|$)',  # Pattern for "Name: Sofia Green Amount due"
     ]
     
     print(f"=== CHILD NAME EXTRACTION DEBUG ===")
@@ -153,6 +157,8 @@ def parse_invoice_data(text: str) -> Dict:
         r'STUDENT\s*(?:REF|REFERENCE|ID|NO)\s*:\s*(\w+)',
         r'(?:REFERENCE|REF)\s*:\s*(\w+)',
         r'(?:ID|NO)\s*:\s*(\w+)',
+        r'STATEMENT\s+FOR\s+[A-Z\s]+-(\w+)',  # Pattern for "Statement for Sofia Green-SG300"
+        r'REFERENCE\s+NUMBER\s+(\w+)',  # Pattern for "reference number SG300"
     ]
     
     for pattern in ref_patterns:
@@ -170,6 +176,7 @@ def parse_invoice_data(text: str) -> Dict:
     # Extract dates
     date_patterns = {
         'issue_date': [
+            r'ISSUED\s*:?\s*(\d{1,2}\s+\w+\s+\d{4})',  # Pattern for "Issued: 25 August 2025"
             r'ISSUE\s*DATE\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
             r'DATE\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
             r'INVOICE\s*DATE\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
@@ -179,10 +186,12 @@ def parse_invoice_data(text: str) -> Dict:
             r'PAYMENT\s*DUE\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
         ],
         'period_start': [
+            r'PERIOD\s*:?\s*(\d{1,2}\s+\w+\s+\d{4})\s*-',  # Pattern for start of "Period: 25 Aug 2025 - 29 Aug 2025"
             r'PERIOD\s*FROM\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
             r'FROM\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
         ],
         'period_end': [
+            r'PERIOD\s*:?\s*\d{1,2}\s+\w+\s+\d{4}\s*-\s*(\d{1,2}\s+\w+\s+\d{4})',  # Pattern for period end from "Period: 25 Aug 2025 - 29 Aug 2025"
             r'PERIOD\s*TO\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
             r'TO\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',
         ]
@@ -195,9 +204,7 @@ def parse_invoice_data(text: str) -> Dict:
                 parsed_date = parse_date_string(match.group(1))
                 if parsed_date:
                     parsed_data[date_key] = parsed_date
-                    break
-        if parsed_data[date_key]:
-            break
+                    break  # Break only from the pattern loop, not the date_key loop
     
     # Extract amounts - Enhanced patterns for better detection
     amount_patterns = {
@@ -213,10 +220,12 @@ def parse_invoice_data(text: str) -> Dict:
             r'DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',  # Simple "DUE: $32.90"
             r'BALANCE\s*DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
             r'OUTSTANDING\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+            r'AMOUNT\s+DUE\s*\(\w+\s+\w+\)\s*\$(\d{1,3}(?:\.\d{2})?)',  # Pattern for "Amount due (GST incl) $166.96"
         ],
         'discount_amount': [
             r'DISCOUNT\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
             r'REDUCTION\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+            r'FEE\s+DISCOUNT.*?-\$(\d{1,3}(?:\.\d{2})?)',  # Pattern for "Fee Discount of 75.00% ... -$241.31"
         ]
     }
     
@@ -268,22 +277,32 @@ def parse_invoice_data(text: str) -> Dict:
     
     # Extract fee type
     fee_patterns = [
+        r'(UNDER\s+\d+\s+FEE)',  # Pattern for "Under 3 Fee" - put this first for better matching
+        r'(\d+\w*\s+FEE)',  # Pattern for fee types like "3 Fee", "Under3 Fee"
         r'FEE\s*TYPE\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
         r'SERVICE\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
-        r'DESCRIPTION\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
     ]
     
     for pattern in fee_patterns:
-        match = re.search(pattern, text)
+        match = re.search(pattern, text, re.IGNORECASE)
         if match:
             parsed_data['fee_type'] = match.group(1).strip()
             break
     
     # Extract provider name (usually at the top of the invoice)
-    for line in text_lines[:5]:  # Check first 5 lines
-        if len(line) > 10 and 'DAYCARE' in line.upper() or 'CHILDCARE' in line.upper():
+    for line in text_lines[:10]:  # Check first 10 lines
+        if (len(line) > 10 and 
+            ('DAYCARE' in line.upper() or 'CHILDCARE' in line.upper() or 
+             'EXPLORERS' in line.upper() or 'NURSERY' in line.upper())):
             parsed_data['provider_name'] = line.strip()
             break
+    
+    # If no provider found in first lines, look for "From:" pattern
+    if not parsed_data['provider_name']:
+        from_pattern = r'FROM:\s*([A-Za-z\s]+?)(?:\n|\s{2,})'
+        match = re.search(from_pattern, text, re.IGNORECASE)
+        if match:
+            parsed_data['provider_name'] = match.group(1).strip()
     
     logger.info(f"Parsed invoice data: {parsed_data}")
     return parsed_data
@@ -304,6 +323,8 @@ def parse_date_string(date_str: str) -> Optional[date]:
         '%d-%m-%Y', '%m-%d-%Y', '%Y-%m-%d',
         '%d/%m/%y', '%m/%d/%y', '%y/%m/%d',
         '%d-%m-%y', '%m-%d-%y', '%y-%m-%d',
+        '%d %B %Y',  # Format for "25 August 2025"
+        '%d %b %Y',  # Format for "25 Aug 2025"
     ]
     
     for fmt in date_formats:
