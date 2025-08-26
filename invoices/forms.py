@@ -6,14 +6,15 @@ from .models import Invoice, Payment, Child, DaycareProvider
 
 
 class InvoiceForm(forms.ModelForm):
-    """Form for creating and editing invoices (Phase 2)"""
+    """Form for creating and editing invoices with enhanced financial tracking"""
     
     class Meta:
         model = Invoice
         fields = [
             'child', 'invoice_reference', 'period_start', 'period_end',
             'issue_date', 'due_date', 'original_amount', 'discount_percentage',
-            'discount_amount', 'amount_due', 'fee_type', 'pdf_file'
+            'discount_amount', 'previous_balance', 'week_amount_due', 
+            'total_amount_due', 'fee_type', 'pdf_file'
         ]
         widgets = {
             'period_start': forms.DateInput(attrs={'type': 'date'}),
@@ -30,11 +31,24 @@ class InvoiceForm(forms.ModelForm):
             # Filter children to only show user's children
             self.fields['child'].queryset = Child.objects.filter(user=user)
         
-        # Make discount fields optional with default values
+        # Make discount and calculated fields optional with default values
         self.fields['discount_percentage'].required = False
         self.fields['discount_amount'].required = False
+        self.fields['previous_balance'].required = False
+        self.fields['week_amount_due'].required = False
+        self.fields['total_amount_due'].required = False
+        
+        # Set default values
         self.fields['discount_percentage'].initial = 0.00
         self.fields['discount_amount'].initial = 0.00
+        self.fields['previous_balance'].initial = 0.00
+        self.fields['week_amount_due'].initial = 0.00
+        self.fields['total_amount_due'].initial = 0.00
+        
+        # Add help text for new fields
+        self.fields['previous_balance'].help_text = "Previous unpaid balance from prior invoices"
+        self.fields['week_amount_due'].help_text = "Amount due for this week only (calculated automatically)"
+        self.fields['total_amount_due'].help_text = "Total amount including previous balance (calculated automatically)"
         
         self.helper = FormHelper()
         self.helper.layout = Layout(
@@ -51,9 +65,14 @@ class InvoiceForm(forms.ModelForm):
                 Column('due_date', css_class='form-group col-md-6 mb-0'),
             ),
             Row(
-                Column('original_amount', css_class='form-group col-md-4 mb-0'),
-                Column('discount_percentage', css_class='form-group col-md-4 mb-0'),
-                Column('amount_due', css_class='form-group col-md-4 mb-0'),
+                Column('original_amount', css_class='form-group col-md-6 mb-0'),
+                Column('discount_percentage', css_class='form-group col-md-3 mb-0'),
+                Column('discount_amount', css_class='form-group col-md-3 mb-0'),
+            ),
+            Row(
+                Column('previous_balance', css_class='form-group col-md-4 mb-0'),
+                Column('week_amount_due', css_class='form-group col-md-4 mb-0'),
+                Column('total_amount_due', css_class='form-group col-md-4 mb-0'),
             ),
             'fee_type',
             'pdf_file',

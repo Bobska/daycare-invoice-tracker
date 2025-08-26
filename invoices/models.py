@@ -85,7 +85,33 @@ class Invoice(models.Model):
     original_amount = models.DecimalField(max_digits=10, decimal_places=2)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
-    amount_due = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    # Enhanced financial tracking
+    previous_balance = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        help_text="Previous unpaid balance carried forward"
+    )
+    week_amount_due = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        help_text="Amount due for this week only (excluding previous balance)"
+    )
+    total_amount_due = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=Decimal('0.00'),
+        help_text="Total amount due including previous balance"
+    )
+    
+    # Legacy field - keeping for backward compatibility
+    amount_due = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        help_text="Legacy field - use total_amount_due instead"
+    )
     
     # Status and tracking
     payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS_CHOICES, default='unpaid')
@@ -135,10 +161,19 @@ class Invoice(models.Model):
     
     def save(self, *args, **kwargs):
         """Override save to ensure validation and calculations"""
-        # Auto-calculate amount_due if not provided
-        if self.original_amount and not self.amount_due:
+        # Auto-calculate week_amount_due if not provided
+        if self.original_amount and not self.week_amount_due:
             discount = self.discount_amount or Decimal('0.00')
-            self.amount_due = self.original_amount - discount
+            self.week_amount_due = self.original_amount - discount
+        
+        # Auto-calculate total_amount_due if not provided
+        if self.week_amount_due and not self.total_amount_due:
+            previous = self.previous_balance or Decimal('0.00')
+            self.total_amount_due = self.week_amount_due + previous
+        
+        # Keep legacy amount_due field in sync with total_amount_due
+        if self.total_amount_due:
+            self.amount_due = self.total_amount_due
         
         # Full clean validation
         self.full_clean()
@@ -153,13 +188,24 @@ class Invoice(models.Model):
     
     @property
     def outstanding_balance(self):
-        """Calculate remaining balance"""
-        return self.amount_due - self.total_paid
+        """Calculate remaining balance (total)"""
+        return self.total_amount_due - self.total_paid
+    
+    @property
+    def week_outstanding_balance(self):
+        """Calculate remaining balance for this week only"""
+        total_paid = self.total_paid
+        # First apply payments to previous balance, then to current week
+        if total_paid >= self.previous_balance:
+            week_paid = total_paid - self.previous_balance
+            return max(Decimal('0.00'), self.week_amount_due - week_paid)
+        else:
+            return self.week_amount_due  # No payments applied to current week yet
     
     def update_payment_status(self):
         """Update payment status based on payments"""
         total_paid = self.total_paid
-        if total_paid >= self.amount_due:
+        if total_paid >= self.total_amount_due:
             self.payment_status = 'paid'
         elif total_paid > 0:
             self.payment_status = 'partial'

@@ -97,9 +97,12 @@ def parse_invoice_data(text: str) -> Dict:
         'period_start': None,
         'period_end': None,
         'original_amount': Decimal('0.00'),
-        'amount_due': Decimal('0.00'),
         'discount_amount': Decimal('0.00'),
         'discount_percentage': Decimal('0.00'),
+        'previous_balance': Decimal('0.00'),
+        'week_amount_due': Decimal('0.00'),
+        'total_amount_due': Decimal('0.00'),
+        'amount_due': Decimal('0.00'),  # Legacy field
         'child_reference': '',
         'child_name': '',
         'fee_type': '',
@@ -206,50 +209,89 @@ def parse_invoice_data(text: str) -> Dict:
                     parsed_data[date_key] = parsed_date
                     break  # Break only from the pattern loop, not the date_key loop
     
-    # Extract amounts - Enhanced patterns for better detection
-    amount_patterns = {
-        'original_amount': [
-            r'SUBTOTAL\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'AMOUNT\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'TOTAL\s*(?:BEFORE|GROSS)\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-        ],
-        'amount_due': [
-            r'TOTAL\s*(?:DUE|AMOUNT)?\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'AMOUNT\s*DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'FINAL\s*AMOUNT\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',  # Simple "DUE: $32.90"
-            r'BALANCE\s*DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'OUTSTANDING\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'AMOUNT\s+DUE\s*\(\w+\s+\w+\)\s*\$(\d{1,3}(?:\.\d{2})?)',  # Pattern for "Amount due (GST incl) $166.96"
-        ],
-        'discount_amount': [
-            r'DISCOUNT\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'REDUCTION\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'FEE\s+DISCOUNT.*?-\$(\d{1,3}(?:\.\d{2})?)',  # Pattern for "Fee Discount of 75.00% ... -$241.31"
-        ]
-    }
+    # Extract amounts - Enhanced patterns for detailed financial breakdown
+    print(f"=== ENHANCED AMOUNT EXTRACTION DEBUG ===")
     
-    print(f"=== AMOUNT EXTRACTION DEBUG ===")
+    # Split text into lines for multi-line pattern matching
+    text_lines = text.split('\n')
     
-    for amount_key, patterns in amount_patterns.items():
-        print(f"Extracting {amount_key}:")
-        for pattern in patterns:
-            match = re.search(pattern, text_upper)
-            if match:
-                try:
-                    amount_str = match.group(1).replace(',', '')
-                    parsed_data[amount_key] = Decimal(amount_str)
-                    print(f"  Found {amount_key}: ${amount_str} using pattern: {pattern}")
+    # Extract Previous Balance
+    for line in text_lines:
+        if 'Previous Balance' in line:
+            prev_match = re.search(r'\$(\d+\.\d{2})', line)
+            if prev_match:
+                parsed_data['previous_balance'] = Decimal(prev_match.group(1))
+                print(f"  Found previous_balance: ${parsed_data['previous_balance']}")
+                break
+    
+    # Extract Original Amount (multi-line: Under 3 Fee line followed by amount line)
+    for i, line in enumerate(text_lines):
+        if 'Under 3 Fee' in line or '1Under 3 Fee' in line:
+            # Check current line for amount
+            amount_match = re.search(r'\$(\d+\.\d{2})', line)
+            if amount_match:
+                parsed_data['original_amount'] = Decimal(amount_match.group(1))
+                print(f"  Found original_amount (same line): ${parsed_data['original_amount']}")
+                break
+            # Check next line for amount
+            elif i + 1 < len(text_lines):
+                next_line = text_lines[i + 1]
+                next_amount_match = re.search(r'\$(\d+\.\d{2})', next_line)
+                if next_amount_match:
+                    parsed_data['original_amount'] = Decimal(next_amount_match.group(1))
+                    print(f"  Found original_amount (next line): ${parsed_data['original_amount']}")
                     break
-                except Exception as e:
-                    print(f"  Error parsing amount {amount_str}: {e}")
-                    continue
-        if parsed_data[amount_key] == Decimal('0.00'):
-            print(f"  No {amount_key} found")
     
-    # Fallback: Try to find ANY dollar amount as potential amount due
-    if parsed_data['amount_due'] == Decimal('0.00'):
-        print("Trying fallback dollar amount extraction...")
+    # Extract Discount Amount (multi-line: Fee Discount line followed by amount line)
+    for i, line in enumerate(text_lines):
+        if 'Fee Discount' in line:
+            # Extract discount percentage
+            pct_match = re.search(r'(\d+\.\d{2})%', line)
+            if pct_match:
+                parsed_data['discount_percentage'] = Decimal(pct_match.group(1))
+                print(f"  Found discount_percentage: {parsed_data['discount_percentage']}%")
+            
+            # Check current line for discount amount
+            discount_match = re.search(r'-\$(\d+\.\d{2})', line)
+            if discount_match:
+                parsed_data['discount_amount'] = Decimal(discount_match.group(1))
+                print(f"  Found discount_amount (same line): ${parsed_data['discount_amount']}")
+                break
+            # Check next line for discount amount
+            elif i + 1 < len(text_lines):
+                next_line = text_lines[i + 1]
+                next_discount_match = re.search(r'-\$(\d+\.\d{2})', next_line)
+                if next_discount_match:
+                    parsed_data['discount_amount'] = Decimal(next_discount_match.group(1))
+                    print(f"  Found discount_amount (next line): ${parsed_data['discount_amount']}")
+                    break
+    
+    # Extract Total Amount Due
+    total_due_patterns = [
+        r'Amount due \(GST incl\)\s*\$(\d+\.\d{2})',
+        r'AMOUNT\s+DUE\s*\(\w+\s+\w+\)\s*\$(\d+\.\d{2})',
+    ]
+    
+    for pattern in total_due_patterns:
+        match = re.search(pattern, text_upper)
+        if match:
+            parsed_data['total_amount_due'] = Decimal(match.group(1))
+            print(f"  Found total_amount_due: ${parsed_data['total_amount_due']}")
+            break
+    
+    # Calculate week amount due
+    if (parsed_data['original_amount'] > 0 and parsed_data['discount_amount'] > 0):
+        parsed_data['week_amount_due'] = parsed_data['original_amount'] - parsed_data['discount_amount']
+        print(f"  Calculated week_amount_due: ${parsed_data['week_amount_due']}")
+    
+    # Set legacy amount_due field to total_amount_due for backward compatibility
+    if parsed_data['total_amount_due'] > 0:
+        parsed_data['amount_due'] = parsed_data['total_amount_due']
+        print(f"  Set legacy amount_due: ${parsed_data['amount_due']}")
+    
+    # Fallback: Try to find ANY dollar amount as potential amount due if nothing found
+    if parsed_data['total_amount_due'] == Decimal('0.00'):
+        print("  Trying fallback dollar amount extraction...")
         fallback_pattern = r'\$(\d{1,3}(?:\.\d{2})?)'
         fallback_matches = re.findall(fallback_pattern, text)
         if fallback_matches:
@@ -261,10 +303,42 @@ def parse_invoice_data(text: str) -> Dict:
                 except:
                     continue
             if amounts:
-                parsed_data['amount_due'] = max(amounts)
-                print(f"  Fallback found amount_due: ${parsed_data['amount_due']}")
+                parsed_data['total_amount_due'] = max(amounts)
+                parsed_data['amount_due'] = parsed_data['total_amount_due']
+                print(f"  Fallback found total_amount_due: ${parsed_data['total_amount_due']}")
     
-    print(f"=== END AMOUNT EXTRACTION ===")
+    print(f"=== END ENHANCED AMOUNT EXTRACTION ===")
+    
+    # Legacy amount patterns (keeping for other invoice formats)
+    amount_patterns = {
+        'amount_due_fallback': [
+            r'TOTAL\s*(?:DUE|AMOUNT)?\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+            r'AMOUNT\s*DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+            r'FINAL\s*AMOUNT\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+            r'DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+            r'BALANCE\s*DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+            r'OUTSTANDING\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+        ]
+    }
+    
+    # Only use fallback patterns if we haven't found amounts yet
+    if parsed_data['total_amount_due'] == Decimal('0.00'):
+        print(f"=== FALLBACK AMOUNT EXTRACTION ===")
+        for amount_key, patterns in amount_patterns.items():
+            for pattern in patterns:
+                match = re.search(pattern, text_upper)
+                if match:
+                    try:
+                        amount_str = match.group(1).replace(',', '')
+                        parsed_data['total_amount_due'] = Decimal(amount_str)
+                        parsed_data['amount_due'] = parsed_data['total_amount_due']
+                        print(f"  Fallback found total_amount_due: ${amount_str} using pattern: {pattern}")
+                        break
+                    except Exception as e:
+                        print(f"  Error parsing amount {amount_str}: {e}")
+                        continue
+            if parsed_data['total_amount_due'] > Decimal('0.00'):
+                break
     
     # Extract discount percentage
     discount_pct_pattern = r'DISCOUNT\s*:?\s*(\d{1,2})%'
