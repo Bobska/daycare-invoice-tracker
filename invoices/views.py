@@ -130,12 +130,24 @@ class InvoiceCreateView(LoginRequiredMixin, CreateView):
         kwargs['user'] = self.request.user
         return kwargs
     
+    def post(self, request, *args, **kwargs):
+        print("=== INVOICE FORM POST DATA ===")
+        print("POST data:", request.POST)
+        print("FILES:", request.FILES)
+        print("=== END DEBUG ===")
+        return super().post(request, *args, **kwargs)
+    
     def form_valid(self, form):
+        print("=== INVOICE FORM VALID ===")
+        print("Form cleaned data:", form.cleaned_data)
         invoice = form.save(commit=False)
+        print(f"Created invoice object: {invoice}")
         
         # Process PDF if uploaded
         if form.cleaned_data.get('pdf_file'):
+            print("Processing PDF file...")
             result = process_uploaded_invoice(form.cleaned_data['pdf_file'], self.request.user)
+            print(f"PDF processing result: {result}")
             
             if result['warnings']:
                 for warning in result['warnings']:
@@ -147,7 +159,14 @@ class InvoiceCreateView(LoginRequiredMixin, CreateView):
                 return self.form_invalid(form)
         
         messages.success(self.request, f'Invoice {invoice.invoice_reference} created successfully!')
+        print("=== INVOICE FORM SUCCESS ===")
         return super().form_valid(form)
+    
+    def form_invalid(self, form):
+        print("=== INVOICE FORM INVALID ===")
+        print("Form errors:", form.errors)
+        print("=== END FORM ERRORS ===")
+        return super().form_invalid(form)
 
 
 class InvoiceDetailView(LoginRequiredMixin, DetailView):
@@ -213,9 +232,27 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
         
         return initial
     
+    def post(self, request, *args, **kwargs):
+        print("=== PAYMENT FORM POST DATA ===")
+        print("POST data:", request.POST)
+        print("FILES:", request.FILES)
+        print("=== END DEBUG ===")
+        return super().post(request, *args, **kwargs)
+    
     def form_valid(self, form):
+        print("=== PAYMENT FORM VALID ===")
+        print("Form cleaned data:", form.cleaned_data)
+        payment = form.save(commit=False)
+        print(f"Created payment object: {payment}")
         messages.success(self.request, 'Payment recorded successfully!')
+        print("=== PAYMENT FORM SUCCESS ===")
         return super().form_valid(form)
+    
+    def form_invalid(self, form):
+        print("=== PAYMENT FORM INVALID ===")
+        print("Form errors:", form.errors)
+        print("=== END FORM ERRORS ===")
+        return super().form_invalid(form)
 
 
 class PaymentDetailView(LoginRequiredMixin, DetailView):
@@ -254,10 +291,28 @@ class ChildCreateView(LoginRequiredMixin, CreateView):
     template_name = 'invoices/child_form.html'
     success_url = reverse_lazy('invoices:child_list')
     
+    def post(self, request, *args, **kwargs):
+        print("=== CHILD FORM POST DATA ===")
+        print("POST data:", request.POST)
+        print("FILES:", request.FILES)
+        print("=== END DEBUG ===")
+        return super().post(request, *args, **kwargs)
+    
     def form_valid(self, form):
+        print("=== CHILD FORM VALID ===")
+        print("Form cleaned data:", form.cleaned_data)
         form.instance.user = self.request.user
+        child = form.save()
+        print(f"Created child object: {child}")
         messages.success(self.request, f'Child {form.instance.name} added successfully!')
+        print("=== CHILD FORM SUCCESS ===")
         return super().form_valid(form)
+    
+    def form_invalid(self, form):
+        print("=== CHILD FORM INVALID ===")
+        print("Form errors:", form.errors)
+        print("=== END FORM ERRORS ===")
+        return super().form_invalid(form)
 
 
 class ChildUpdateView(LoginRequiredMixin, UpdateView):

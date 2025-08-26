@@ -32,10 +32,16 @@ def extract_pdf_text(pdf_file) -> str:
             page = pdf_reader.pages[page_num]
             text += page.extract_text() + "\n"
         
+        # DEBUG: Print extracted text to console
+        print("=== EXTRACTED PDF TEXT ===")
+        print(text)
+        print("=== END EXTRACTED TEXT ===")
+        
         logger.info(f"Successfully extracted text from PDF: {len(text)} characters")
         return text.strip()
         
     except Exception as e:
+        print(f"PDF extraction error: {str(e)}")
         logger.error(f"Error extracting PDF text: {str(e)}")
         return ""
 
@@ -83,31 +89,49 @@ def parse_invoice_data(text: str) -> Dict:
             parsed_data['invoice_reference'] = match.group(1)
             break
     
-    # Extract child name and reference
-    child_patterns = [
-        r'CHILD\s*(?:NAME)?\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
-        r'STUDENT\s*(?:NAME)?\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
-        r'(?:FOR|CHILD):\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+    # Extract child name and reference (case insensitive search on uppercase text)
+    child_patterns_upper = [
+        r'CHILD\s*NAME\s*:\s*([A-Z\s]+)',
+        r'STUDENT\s*NAME\s*:\s*([A-Z\s]+)',
+        r'CHILD\s*:\s*([A-Z\s]+)',
+        r'FOR\s*:\s*([A-Z\s]+)',
     ]
     
-    for pattern in child_patterns:
-        match = re.search(pattern, text)
+    print(f"=== CHILD NAME EXTRACTION DEBUG ===")
+    print(f"Original text: '{text}'")
+    print(f"Uppercase text: '{text_upper}'")
+    
+    for pattern in child_patterns_upper:
+        match = re.search(pattern, text_upper)
         if match:
-            parsed_data['child_name'] = match.group(1).strip()
+            name_part = match.group(1).strip()
+            # Convert back to title case for proper name formatting
+            parsed_data['child_name'] = ' '.join(word.capitalize() for word in name_part.split())
+            print(f"Found child_name: '{parsed_data['child_name']}' using pattern: {pattern}")
             break
     
-    # Extract child reference number
+    if not parsed_data['child_name']:
+        print("No child name found")
+    
+    # Extract child reference number - More specific patterns
     ref_patterns = [
-        r'CHILD\s*(?:REF|REFERENCE|ID|NO)\s*:?\s*(\w+)',
-        r'STUDENT\s*(?:REF|REFERENCE|ID|NO)\s*:?\s*(\w+)',
-        r'ID\s*:?\s*(\w+)',
+        r'CHILD\s*(?:REF|REFERENCE|ID|NO)\s*:\s*(\w+)',
+        r'STUDENT\s*(?:REF|REFERENCE|ID|NO)\s*:\s*(\w+)',
+        r'(?:REFERENCE|REF)\s*:\s*(\w+)',
+        r'(?:ID|NO)\s*:\s*(\w+)',
     ]
     
     for pattern in ref_patterns:
         match = re.search(pattern, text_upper)
         if match:
             parsed_data['child_reference'] = match.group(1)
+            print(f"Found child_reference: '{parsed_data['child_reference']}' using pattern: {pattern}")
             break
+    
+    if not parsed_data['child_reference']:
+        print("No child reference found")
+    
+    print(f"=== END CHILD EXTRACTION ===")
     
     # Extract dates
     date_patterns = {
@@ -141,7 +165,7 @@ def parse_invoice_data(text: str) -> Dict:
         if parsed_data[date_key]:
             break
     
-    # Extract amounts
+    # Extract amounts - Enhanced patterns for better detection
     amount_patterns = {
         'original_amount': [
             r'SUBTOTAL\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
@@ -149,9 +173,12 @@ def parse_invoice_data(text: str) -> Dict:
             r'TOTAL\s*(?:BEFORE|GROSS)\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
         ],
         'amount_due': [
-            r'TOTAL\s*(?:DUE|AMOUNT)\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+            r'TOTAL\s*(?:DUE|AMOUNT)?\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
             r'AMOUNT\s*DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
             r'FINAL\s*AMOUNT\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+            r'DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',  # Simple "DUE: $32.90"
+            r'BALANCE\s*DUE\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
+            r'OUTSTANDING\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
         ],
         'discount_amount': [
             r'DISCOUNT\s*:?\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
@@ -159,18 +186,42 @@ def parse_invoice_data(text: str) -> Dict:
         ]
     }
     
+    print(f"=== AMOUNT EXTRACTION DEBUG ===")
+    
     for amount_key, patterns in amount_patterns.items():
+        print(f"Extracting {amount_key}:")
         for pattern in patterns:
             match = re.search(pattern, text_upper)
             if match:
                 try:
                     amount_str = match.group(1).replace(',', '')
                     parsed_data[amount_key] = Decimal(amount_str)
+                    print(f"  Found {amount_key}: ${amount_str} using pattern: {pattern}")
                     break
+                except Exception as e:
+                    print(f"  Error parsing amount {amount_str}: {e}")
+                    continue
+        if parsed_data[amount_key] == Decimal('0.00'):
+            print(f"  No {amount_key} found")
+    
+    # Fallback: Try to find ANY dollar amount as potential amount due
+    if parsed_data['amount_due'] == Decimal('0.00'):
+        print("Trying fallback dollar amount extraction...")
+        fallback_pattern = r'\$(\d{1,3}(?:\.\d{2})?)'
+        fallback_matches = re.findall(fallback_pattern, text)
+        if fallback_matches:
+            # Take the largest dollar amount found
+            amounts = []
+            for amount_str in fallback_matches:
+                try:
+                    amounts.append(Decimal(amount_str))
                 except:
                     continue
-        if parsed_data[amount_key] != Decimal('0.00'):
-            break
+            if amounts:
+                parsed_data['amount_due'] = max(amounts)
+                print(f"  Fallback found amount_due: ${parsed_data['amount_due']}")
+    
+    print(f"=== END AMOUNT EXTRACTION ===")
     
     # Extract discount percentage
     discount_pct_pattern = r'DISCOUNT\s*:?\s*(\d{1,2})%'
@@ -473,21 +524,53 @@ def process_uploaded_invoice(pdf_file, user) -> Dict:
         if not parsed_data.get('amount_due') or parsed_data['amount_due'] == Decimal('0.00'):
             result['warnings'].append('Invoice amount could not be extracted.')
         
-        # Try to match child
+        # Try to match child - Enhanced matching strategy
         if parsed_data.get('child_reference') or parsed_data.get('child_name'):
             from .models import Child
             
             child_query = Child.objects.filter(user=user)
-            if parsed_data.get('child_reference'):
-                child_query = child_query.filter(reference_number__icontains=parsed_data['child_reference'])
-            elif parsed_data.get('child_name'):
-                child_query = child_query.filter(name__icontains=parsed_data['child_name'])
+            child = None
             
-            child = child_query.first()
+            print(f"=== CHILD MATCHING DEBUG ===")
+            print(f"Available children for user: {[child.name for child in child_query]}")
+            print(f"Extracted child_reference: '{parsed_data.get('child_reference')}'")
+            print(f"Extracted child_name: '{parsed_data.get('child_name')}'")
+            
+            # Strategy 1: Exact reference match
+            if parsed_data.get('child_reference'):
+                child = child_query.filter(reference_number=parsed_data['child_reference']).first()
+                if child:
+                    print(f"  Strategy 1 SUCCESS: Exact reference match - {child.name}")
+            
+            # Strategy 2: Partial reference match
+            if not child and parsed_data.get('child_reference'):
+                child = child_query.filter(reference_number__icontains=parsed_data['child_reference']).first()
+                if child:
+                    print(f"  Strategy 2 SUCCESS: Partial reference match - {child.name}")
+            
+            # Strategy 3: Name matching (partial)
+            if not child and parsed_data.get('child_name'):
+                child = child_query.filter(name__icontains=parsed_data['child_name']).first()
+                if child:
+                    print(f"  Strategy 3 SUCCESS: Name match - {child.name}")
+            
+            # Strategy 4: If only one child exists, suggest it
+            if not child and child_query.count() == 1:
+                child = child_query.first()
+                if child:  # Additional safety check
+                    result['warnings'].append(f'Automatically selected your only child: {child.name}')
+                    print(f"  Strategy 4 SUCCESS: Only child auto-selected - {child.name}")
+            
             if child:
                 parsed_data['matched_child_id'] = child.pk
+                print(f"  FINAL MATCH: {child.name} (ID: {child.pk})")
             else:
                 result['warnings'].append('Could not match extracted child information to existing children.')
+                print(f"  NO MATCH FOUND")
+                
+            print(f"=== END CHILD MATCHING ===")
+        else:
+            print("No child reference or name extracted from PDF")
         
         result['success'] = True
         result['data'] = parsed_data

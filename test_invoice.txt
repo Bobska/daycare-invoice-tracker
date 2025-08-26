@@ -1,0 +1,16 @@
+Simple Invoice Test
+
+DAYCARE CENTER
+Invoice Date: 2025-08-25
+Due Date: 2025-09-01
+
+Child: Test Child
+Reference: TC001
+
+Period: 2025-08-01 to 2025-08-31
+
+Description: Monthly Daycare Fee
+Amount Due: $125.50
+
+Please pay by the due date.
+Thank you!

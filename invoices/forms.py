@@ -30,6 +30,12 @@ class InvoiceForm(forms.ModelForm):
             # Filter children to only show user's children
             self.fields['child'].queryset = Child.objects.filter(user=user)
         
+        # Make discount fields optional with default values
+        self.fields['discount_percentage'].required = False
+        self.fields['discount_amount'].required = False
+        self.fields['discount_percentage'].initial = 0.00
+        self.fields['discount_amount'].initial = 0.00
+        
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(
