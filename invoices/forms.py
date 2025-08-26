@@ -39,20 +39,24 @@ class InvoiceForm(forms.ModelForm):
         self.fields['total_amount_due'].required = False
         
         # Make calculated fields readonly (they'll be calculated by JavaScript)
+        # Note: Using 'data-calculated' instead of 'readonly' to allow JavaScript updates
         self.fields['discount_amount'].widget.attrs.update({
-            'readonly': True,
-            'class': 'form-control-plaintext',
-            'style': 'background-color: #f8f9fa;'
+            'data-calculated': 'true',
+            'class': 'form-control calculated-field',
+            'style': 'background-color: #f8f9fa; pointer-events: none;',
+            'tabindex': '-1'
         })
         self.fields['week_amount_due'].widget.attrs.update({
-            'readonly': True,
-            'class': 'form-control-plaintext',
-            'style': 'background-color: #f8f9fa;'
+            'data-calculated': 'true',
+            'class': 'form-control calculated-field',
+            'style': 'background-color: #f8f9fa; pointer-events: none;',
+            'tabindex': '-1'
         })
         self.fields['total_amount_due'].widget.attrs.update({
-            'readonly': True,
-            'class': 'form-control-plaintext', 
-            'style': 'background-color: #f8f9fa;'
+            'data-calculated': 'true',
+            'class': 'form-control calculated-field', 
+            'style': 'background-color: #f8f9fa; pointer-events: none;',
+            'tabindex': '-1'
         })
         
         # Set default values

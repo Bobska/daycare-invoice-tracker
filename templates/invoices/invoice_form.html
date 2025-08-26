@@ -240,9 +240,12 @@ document.addEventListener('DOMContentLoaded', function() {
             'id_issue_date': data.issue_date,
             'id_due_date': data.due_date,
             'id_original_amount': data.original_amount,
-            'id_amount_due': data.amount_due,
-            'id_discount_amount': data.discount_amount,
             'id_discount_percentage': data.discount_percentage,
+            'id_discount_amount': data.discount_amount,
+            'id_previous_balance': data.previous_balance,
+            'id_week_amount_due': data.week_amount_due,
+            'id_total_amount_due': data.total_amount_due,
+            'id_amount_due': data.amount_due,
             'id_fee_type': data.fee_type,
         };
 
@@ -260,6 +263,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 childField.value = data.matched_child_id;
             }
         }
+        
+        // Trigger calculation after populating fields to ensure all calculations are updated
+        calculateAmounts();
     }
 
     function showWarnings(warnings) {
@@ -290,38 +296,80 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Financial calculations
     function calculateAmounts() {
-        const originalAmount = parseFloat(document.getElementById('id_original_amount').value) || 0;
-        const discountPercentage = parseFloat(document.getElementById('id_discount_percentage').value) || 0;
-        const previousBalance = parseFloat(document.getElementById('id_previous_balance').value) || 0;
+        console.log('calculateAmounts called'); // Debug log
+        
+        const originalAmount = parseFloat(document.getElementById('id_original_amount')?.value) || 0;
+        const discountPercentage = parseFloat(document.getElementById('id_discount_percentage')?.value) || 0;
+        const previousBalance = parseFloat(document.getElementById('id_previous_balance')?.value) || 0;
+        
+        console.log('Values:', { originalAmount, discountPercentage, previousBalance }); // Debug log
         
         // Calculate discount amount
         const discountAmount = (originalAmount * discountPercentage) / 100;
-        document.getElementById('id_discount_amount').value = discountAmount.toFixed(2);
+        const discountField = document.getElementById('id_discount_amount');
+        if (discountField) {
+            discountField.value = discountAmount.toFixed(2);
+        }
         
         // Calculate week amount due (original - discount)
         const weekAmountDue = originalAmount - discountAmount;
-        document.getElementById('id_week_amount_due').value = weekAmountDue.toFixed(2);
+        const weekField = document.getElementById('id_week_amount_due');
+        if (weekField) {
+            weekField.value = weekAmountDue.toFixed(2);
+        }
         
         // Calculate total amount due (week amount + previous balance)
         const totalAmountDue = weekAmountDue + previousBalance;
-        document.getElementById('id_total_amount_due').value = totalAmountDue.toFixed(2);
+        const totalField = document.getElementById('id_total_amount_due');
+        if (totalField) {
+            totalField.value = totalAmountDue.toFixed(2);
+        }
+        
+        console.log('Calculated:', { discountAmount, weekAmountDue, totalAmountDue }); // Debug log
     }
 
-    // Add event listeners for automatic calculation
-    document.addEventListener('DOMContentLoaded', function() {
+    // Setup calculation event listeners
+    function setupCalculationListeners() {
+        console.log('Setting up calculation event listeners'); // Debug log
+        
         const fieldsToWatch = ['id_original_amount', 'id_discount_percentage', 'id_previous_balance'];
         
         fieldsToWatch.forEach(fieldId => {
             const field = document.getElementById(fieldId);
             if (field) {
-                field.addEventListener('input', calculateAmounts);
-                field.addEventListener('change', calculateAmounts);
+                console.log(`Adding listeners to ${fieldId}`); // Debug log
+                
+                // Remove any existing listeners first
+                field.removeEventListener('input', calculateAmounts);
+                field.removeEventListener('change', calculateAmounts);
+                field.removeEventListener('keyup', calculateAmounts);
+                
+                // Add fresh listeners
+                field.addEventListener('input', function() {
+                    console.log(`Input event triggered on ${fieldId}, value: ${field.value}`); // Debug log
+                    calculateAmounts();
+                });
+                field.addEventListener('change', function() {
+                    console.log(`Change event triggered on ${fieldId}, value: ${field.value}`); // Debug log
+                    calculateAmounts();
+                });
+                field.addEventListener('keyup', function() {
+                    console.log(`Keyup event triggered on ${fieldId}, value: ${field.value}`); // Debug log
+                    calculateAmounts();
+                });
+            } else {
+                console.warn(`Field ${fieldId} not found`); // Debug log
             }
         });
         
         // Calculate on page load if values are present
+        console.log('Running initial calculation'); // Debug log
         calculateAmounts();
-    });
+    }
+
+    // Main initialization
+    setupCalculationListeners();
+    
 });
 </script>
 {% endblock %}
