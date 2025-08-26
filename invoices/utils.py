@@ -5,8 +5,36 @@ from typing import Dict, Optional, List
 from datetime import datetime, date
 import PyPDF2
 import logging
+import bleach
+
+# Optional magic import for file type detection
+try:
+    import magic
+    MAGIC_AVAILABLE = True
+except ImportError:
+    MAGIC_AVAILABLE = False
+    logging.warning("python-magic not available. File type validation will be limited.")
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_extracted_text(text: str) -> str:
+    """Sanitize text extracted from PDF to prevent XSS and injection"""
+    if not text:
+        return ""
+    
+    # 1. Remove potentially malicious patterns
+    # Remove script tags, HTML, SQL injection patterns
+    text = bleach.clean(text, tags=[], attributes={}, strip=True)
+    
+    # 2. Remove control characters except newlines and tabs
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]', '', text)
+    
+    # 3. Limit text length to prevent memory issues
+    if len(text) > 50000:  # 50KB limit
+        text = text[:50000] + "... [truncated]"
+    
+    return text.strip()
 
 
 def extract_pdf_text(pdf_file) -> str:
@@ -38,7 +66,10 @@ def extract_pdf_text(pdf_file) -> str:
         print("=== END EXTRACTED TEXT ===")
         
         logger.info(f"Successfully extracted text from PDF: {len(text)} characters")
-        return text.strip()
+        
+        # Sanitize extracted text for security
+        sanitized_text = sanitize_extracted_text(text)
+        return sanitized_text
         
     except Exception as e:
         print(f"PDF extraction error: {str(e)}")
@@ -56,6 +87,9 @@ def parse_invoice_data(text: str) -> Dict:
     Returns:
         Dictionary containing parsed invoice data
     """
+    # Sanitize input text first
+    text = sanitize_extracted_text(text)
+    
     parsed_data = {
         'invoice_reference': '',
         'issue_date': None,
@@ -443,7 +477,7 @@ def match_email_to_provider(sender_email: str, subject: str) -> Optional[int]:
 # File validation utilities
 def validate_pdf_file(file) -> Dict[str, str]:
     """
-    Validate uploaded PDF file
+    Enhanced PDF validation with magic number checking and security features
     
     Args:
         file: Uploaded file object
@@ -453,30 +487,58 @@ def validate_pdf_file(file) -> Dict[str, str]:
     """
     errors = {}
     
-    # Check file extension
-    if not file.name.lower().endswith('.pdf'):
-        errors['file_type'] = 'Only PDF files are allowed.'
-    
-    # Check file size (max 10MB)
-    max_size = 10 * 1024 * 1024  # 10MB in bytes
-    if file.size > max_size:
-        errors['file_size'] = f'File size must be less than 10MB. Current size: {file.size / (1024*1024):.1f}MB'
-    
-    # Check if file is empty
-    if file.size == 0:
-        errors['file_empty'] = 'File appears to be empty.'
-    
-    # Try to read PDF content
-    if not errors:
-        try:
+    try:
+        # Reset file pointer
+        file.seek(0)
+        
+        # 1. Check magic number (actual file content)
+        header = file.read(8)
+        if not header.startswith(b'%PDF-'):
+            errors['file_type'] = 'File is not a valid PDF format.'
+            return errors
+        
+        # 2. Use python-magic for additional validation (if available)
+        if MAGIC_AVAILABLE:
             file.seek(0)
+            try:
+                file_type = magic.from_buffer(file.read(2048), mime=True)
+                if file_type != 'application/pdf':
+                    errors['file_type'] = 'File content does not match PDF format.'
+                    return errors
+            except Exception as e:
+                # Fallback if magic fails - continue with other checks
+                logger.warning(f"Magic number check failed: {str(e)}")
+        else:
+            # Fallback validation without magic - check file extension
+            if not file.name.lower().endswith('.pdf'):
+                errors['file_type'] = 'Only PDF files are allowed (file extension check).'
+        
+        # 3. Check file size (10MB limit)
+        file.seek(0, 2)  # Seek to end
+        size = file.tell()
+        if size > 10 * 1024 * 1024:
+            errors['file_size'] = f'File too large: {size/(1024*1024):.1f}MB. Maximum: 10MB'
+        
+        if size == 0:
+            errors['file_empty'] = 'File appears to be empty.'
+            return errors
+        
+        # 4. Validate PDF structure
+        file.seek(0)
+        try:
             pdf_reader = PyPDF2.PdfReader(file)
             if len(pdf_reader.pages) == 0:
-                errors['pdf_invalid'] = 'PDF file contains no pages.'
+                errors['pdf_invalid'] = 'PDF contains no readable pages.'
         except Exception as e:
-            errors['pdf_corrupt'] = f'PDF file appears to be corrupted: {str(e)}'
-        finally:
-            file.seek(0)  # Reset file pointer
+            errors['pdf_corrupt'] = f'PDF file is corrupted or invalid: {str(e)}'
+        
+        # 5. Reset file pointer for further processing
+        file.seek(0)
+        
+    except Exception as e:
+        errors['file_error'] = f'Error validating file: {str(e)}'
+    
+    return errors
     
     return errors
 

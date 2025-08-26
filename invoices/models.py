@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from decimal import Decimal
 
 User = get_user_model()
@@ -103,6 +104,46 @@ class Invoice(models.Model):
     def __str__(self):
         return f"Invoice {self.invoice_reference} - {self.child.name}"
     
+    def clean(self):
+        """Enhanced model validation"""
+        errors = {}
+        
+        # Validate amount fields
+        if self.amount_due and self.amount_due <= 0:
+            errors['amount_due'] = 'Amount due must be greater than zero.'
+        
+        if self.original_amount and self.original_amount <= 0:
+            errors['original_amount'] = 'Original amount must be greater than zero.'
+        
+        # Validate discount logic
+        if self.discount_amount and self.original_amount:
+            if self.discount_amount > self.original_amount:
+                errors['discount_amount'] = 'Discount amount cannot exceed original amount.'
+        
+        if self.discount_percentage and (self.discount_percentage < 0 or self.discount_percentage > 100):
+            errors['discount_percentage'] = 'Discount percentage must be between 0 and 100.'
+        
+        # Validate date logic
+        if self.period_start and self.period_end and self.period_start >= self.period_end:
+            errors['period_end'] = 'Period end date must be after start date.'
+        
+        if self.issue_date and self.due_date and self.due_date < self.issue_date:
+            errors['due_date'] = 'Due date cannot be before issue date.'
+        
+        if errors:
+            raise ValidationError(errors)
+    
+    def save(self, *args, **kwargs):
+        """Override save to ensure validation and calculations"""
+        # Auto-calculate amount_due if not provided
+        if self.original_amount and not self.amount_due:
+            discount = self.discount_amount or Decimal('0.00')
+            self.amount_due = self.original_amount - discount
+        
+        # Full clean validation
+        self.full_clean()
+        super().save(*args, **kwargs)
+    
     @property
     def total_paid(self):
         """Calculate total amount paid for this invoice"""
@@ -152,7 +193,32 @@ class Payment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    def clean(self):
+        """Payment validation"""
+        errors = {}
+        
+        if self.amount_paid and self.amount_paid <= 0:
+            errors['amount_paid'] = 'Payment amount must be greater than zero.'
+        
+        # Validate payment doesn't exceed invoice amount
+        if self.invoice and self.amount_paid:
+            existing_payments = Payment.objects.filter(
+                invoice=self.invoice
+            ).exclude(pk=self.pk).aggregate(
+                total=models.Sum('amount_paid')
+            )['total'] or Decimal('0.00')
+            
+            total_with_new = existing_payments + self.amount_paid
+            if total_with_new > self.invoice.amount_due:
+                overpayment = total_with_new - self.invoice.amount_due
+                errors['amount_paid'] = f'Payment would result in overpayment of ${overpayment:.2f}.'
+        
+        if errors:
+            raise ValidationError(errors)
+    
     def save(self, *args, **kwargs):
+        # Validate before saving
+        self.full_clean()
         super().save(*args, **kwargs)
         # Update invoice payment status
         self.invoice.update_payment_status()

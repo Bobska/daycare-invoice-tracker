@@ -10,6 +10,10 @@ from decimal import Decimal
 from .models import Invoice, Payment, Child, DaycareProvider
 from .forms import InvoiceForm, PaymentForm, ChildForm
 from .utils import process_uploaded_invoice
+from .logging_config import StructuredLogger, PDFProcessingError, FileUploadError, rate_limit_uploads
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
@@ -20,40 +24,43 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         
-        # Get user's children and related data
-        user_children = Child.objects.filter(user=user)
-        user_invoices = Invoice.objects.filter(child__user=user)
-        user_payments = Payment.objects.filter(invoice__child__user=user)
+        # OPTIMIZED: Single query with all related data
+        user_invoices = Invoice.objects.filter(child__user=user)\
+            .select_related('child', 'child__daycare_provider')\
+            .prefetch_related('payments')\
+            .order_by('-issue_date')
         
-        # Calculate statistics
-        context['stats'] = {
-            'total_children': user_children.count(),
-            'total_invoices': user_invoices.count(),
-            'total_payments': user_payments.count(),
-            'total_amount_due': user_invoices.aggregate(
-                total=Sum('amount_due')
-            )['total'] or Decimal('0.00'),
-            'total_paid': user_payments.aggregate(
-                total=Sum('amount_paid')
-            )['total'] or Decimal('0.00'),
-            'unpaid_invoices': user_invoices.filter(payment_status='unpaid').count(),
-            'overdue_invoices': user_invoices.filter(payment_status='overdue').count(),
-        }
+        user_children = Child.objects.filter(user=user)\
+            .select_related('daycare_provider')\
+            .prefetch_related('invoices')
         
-        # Calculate outstanding balance
-        context['stats']['outstanding_balance'] = (
-            context['stats']['total_amount_due'] - context['stats']['total_paid']
+        # Calculate statistics in database, not Python
+        stats = user_invoices.aggregate(
+            total_invoices=Count('id'),
+            total_amount_due=Sum('amount_due'),
+            total_paid=Sum('payments__amount_paid'),
+            unpaid_count=Count('id', filter=Q(payment_status='unpaid')),
+            overdue_count=Count('id', filter=Q(payment_status='overdue'))
         )
         
-        # Recent invoices
-        context['recent_invoices'] = user_invoices.select_related(
-            'child', 'child__daycare_provider'
-        ).order_by('-created_at')[:5]
+        # Handle None values from Sum()
+        stats['total_amount_due'] = stats['total_amount_due'] or Decimal('0.00')
+        stats['total_paid'] = stats['total_paid'] or Decimal('0.00')
+        stats['outstanding_balance'] = stats['total_amount_due'] - stats['total_paid']
+        stats['total_children'] = user_children.count()
         
-        # Recent payments
-        context['recent_payments'] = user_payments.select_related(
-            'invoice', 'invoice__child'
-        ).order_by('-payment_date')[:5]
+        # Get payment count separately since we need to count payments, not invoices
+        stats['total_payments'] = Payment.objects.filter(
+            invoice__child__user=user
+        ).count()
+        
+        context['stats'] = stats
+        
+        # Limit recent items for performance
+        context['recent_invoices'] = user_invoices[:5]
+        context['recent_payments'] = Payment.objects.filter(
+            invoice__child__user=user
+        ).select_related('invoice', 'invoice__child').order_by('-payment_date')[:5]
         
         return context
 
@@ -130,6 +137,7 @@ class InvoiceCreateView(LoginRequiredMixin, CreateView):
         kwargs['user'] = self.request.user
         return kwargs
     
+    @rate_limit_uploads(max_uploads=5, window_minutes=10)
     def post(self, request, *args, **kwargs):
         print("=== INVOICE FORM POST DATA ===")
         print("POST data:", request.POST)
@@ -138,34 +146,82 @@ class InvoiceCreateView(LoginRequiredMixin, CreateView):
         return super().post(request, *args, **kwargs)
     
     def form_valid(self, form):
-        print("=== INVOICE FORM VALID ===")
-        print("Form cleaned data:", form.cleaned_data)
-        invoice = form.save(commit=False)
-        print(f"Created invoice object: {invoice}")
+        correlation_id = StructuredLogger.get_correlation_id(self.request)
         
-        # Process PDF if uploaded
-        if form.cleaned_data.get('pdf_file'):
-            print("Processing PDF file...")
-            result = process_uploaded_invoice(form.cleaned_data['pdf_file'], self.request.user)
-            print(f"PDF processing result: {result}")
+        try:
+            print("=== INVOICE FORM VALID ===")
+            print("Form cleaned data:", form.cleaned_data)
+            invoice = form.save(commit=False)
+            print(f"Created invoice object: {invoice}")
             
-            if result['warnings']:
-                for warning in result['warnings']:
-                    messages.warning(self.request, warning)
+            # Process PDF if uploaded
+            if form.cleaned_data.get('pdf_file'):
+                try:
+                    print("Processing PDF file...")
+                    result = process_uploaded_invoice(form.cleaned_data['pdf_file'], self.request.user)
+                    print(f"PDF processing result: {result}")
+                    
+                    if result['errors']:
+                        StructuredLogger.log_error(
+                            logger, 
+                            "PDF processing failed",
+                            request=self.request,
+                            extra_data={'pdf_errors': result['errors']}
+                        )
+                        for error in result['errors'].values():
+                            messages.error(self.request, error)
+                        return self.form_invalid(form)
+                    
+                    if result['warnings']:
+                        for warning in result['warnings']:
+                            messages.warning(self.request, warning)
+                            
+                except Exception as e:
+                    StructuredLogger.log_error(
+                        logger,
+                        "Unexpected error during PDF processing",
+                        error=e,
+                        request=self.request
+                    )
+                    messages.error(self.request, "An error occurred while processing the PDF. Please try again.")
+                    return self.form_invalid(form)
             
-            if result['errors']:
-                for error in result['errors'].values():
-                    messages.error(self.request, error)
-                return self.form_invalid(form)
-        
-        messages.success(self.request, f'Invoice {invoice.invoice_reference} created successfully!')
-        print("=== INVOICE FORM SUCCESS ===")
-        return super().form_valid(form)
+            # Log successful invoice creation
+            StructuredLogger.log_info(
+                logger,
+                "Invoice created successfully",
+                request=self.request,
+                extra_data={
+                    'invoice_reference': invoice.invoice_reference,
+                    'child_id': invoice.child.id if invoice.child else None
+                }
+            )
+            
+            messages.success(self.request, f'Invoice {invoice.invoice_reference} created successfully!')
+            print("=== INVOICE FORM SUCCESS ===")
+            return super().form_valid(form)
+            
+        except Exception as e:
+            StructuredLogger.log_error(
+                logger,
+                "Unexpected error during invoice creation",
+                error=e,
+                request=self.request
+            )
+            messages.error(self.request, "An unexpected error occurred. Please try again.")
+            return self.form_invalid(form)
     
     def form_invalid(self, form):
         print("=== INVOICE FORM INVALID ===")
         print("Form errors:", form.errors)
         print("=== END FORM ERRORS ===")
+        
+        StructuredLogger.log_error(
+            logger,
+            "Invoice form validation failed",
+            request=self.request,
+            extra_data={'form_errors': form.errors}
+        )
         return super().form_invalid(form)
 
 
