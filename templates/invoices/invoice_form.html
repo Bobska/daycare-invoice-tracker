@@ -287,6 +287,41 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadArea.parentNode.appendChild(alert);
         }
     }
+
+    // Financial calculations
+    function calculateAmounts() {
+        const originalAmount = parseFloat(document.getElementById('id_original_amount').value) || 0;
+        const discountPercentage = parseFloat(document.getElementById('id_discount_percentage').value) || 0;
+        const previousBalance = parseFloat(document.getElementById('id_previous_balance').value) || 0;
+        
+        // Calculate discount amount
+        const discountAmount = (originalAmount * discountPercentage) / 100;
+        document.getElementById('id_discount_amount').value = discountAmount.toFixed(2);
+        
+        // Calculate week amount due (original - discount)
+        const weekAmountDue = originalAmount - discountAmount;
+        document.getElementById('id_week_amount_due').value = weekAmountDue.toFixed(2);
+        
+        // Calculate total amount due (week amount + previous balance)
+        const totalAmountDue = weekAmountDue + previousBalance;
+        document.getElementById('id_total_amount_due').value = totalAmountDue.toFixed(2);
+    }
+
+    // Add event listeners for automatic calculation
+    document.addEventListener('DOMContentLoaded', function() {
+        const fieldsToWatch = ['id_original_amount', 'id_discount_percentage', 'id_previous_balance'];
+        
+        fieldsToWatch.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.addEventListener('input', calculateAmounts);
+                field.addEventListener('change', calculateAmounts);
+            }
+        });
+        
+        // Calculate on page load if values are present
+        calculateAmounts();
+    });
 });
 </script>
 {% endblock %}

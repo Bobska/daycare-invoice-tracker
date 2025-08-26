@@ -25,7 +25,7 @@ class StructuredLogger:
     def log_error(logger, message, error=None, request=None, extra_data=None):
         """Structured error logging"""
         log_data = {
-            'message': message,
+            'event_message': message,
             'correlation_id': StructuredLogger.get_correlation_id(request) if request else None,
             'user_id': request.user.id if request and request.user.is_authenticated else None,
         }
@@ -46,7 +46,7 @@ class StructuredLogger:
     def log_info(logger, message, request=None, extra_data=None):
         """Structured info logging"""
         log_data = {
-            'message': message,
+            'event_message': message,
             'correlation_id': StructuredLogger.get_correlation_id(request) if request else None,
             'user_id': request.user.id if request and request.user.is_authenticated else None,
         }
@@ -77,7 +77,7 @@ import time
 def rate_limit_uploads(max_uploads=5, window_minutes=10):
     """Rate limiting decorator for file uploads"""
     def decorator(view_func):
-        def wrapper(request, *args, **kwargs):
+        def wrapper(self, request, *args, **kwargs):
             if request.method == 'POST' and request.FILES:
                 user_id = request.user.id if request.user.is_authenticated else request.META.get('REMOTE_ADDR')
                 cache_key = f'upload_rate_limit_{user_id}'
@@ -95,6 +95,6 @@ def rate_limit_uploads(max_uploads=5, window_minutes=10):
                 uploads.append(now)
                 cache.set(cache_key, uploads, window_minutes * 60)
             
-            return view_func(request, *args, **kwargs)
+            return view_func(self, request, *args, **kwargs)
         return wrapper
     return decorator

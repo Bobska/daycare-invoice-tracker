@@ -38,6 +38,23 @@ class InvoiceForm(forms.ModelForm):
         self.fields['week_amount_due'].required = False
         self.fields['total_amount_due'].required = False
         
+        # Make calculated fields readonly (they'll be calculated by JavaScript)
+        self.fields['discount_amount'].widget.attrs.update({
+            'readonly': True,
+            'class': 'form-control-plaintext',
+            'style': 'background-color: #f8f9fa;'
+        })
+        self.fields['week_amount_due'].widget.attrs.update({
+            'readonly': True,
+            'class': 'form-control-plaintext',
+            'style': 'background-color: #f8f9fa;'
+        })
+        self.fields['total_amount_due'].widget.attrs.update({
+            'readonly': True,
+            'class': 'form-control-plaintext', 
+            'style': 'background-color: #f8f9fa;'
+        })
+        
         # Set default values
         self.fields['discount_percentage'].initial = 0.00
         self.fields['discount_amount'].initial = 0.00
